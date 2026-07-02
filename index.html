@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="暗算">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>暗算トレーナー</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --card2: #273549;
+    --text: #e2e8f0;
+    --sub: #94a3b8;
+    --accent: #38bdf8;
+    --accent2: #a78bfa;
+    --ok: #4ade80;
+    --ng: #f87171;
+    --border: #334155;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  button, input { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 16px; }
+  header { display: flex; align-items: baseline; gap: 12px; margin: 8px 0 16px; }
+  header h1 { font-size: 22px; margin: 0; }
+  header .sub { color: var(--sub); font-size: 13px; }
+  nav { display: flex; gap: 8px; margin-bottom: 16px; }
+  nav button {
+    flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card); color: var(--sub); font-size: 15px; cursor: pointer;
+  }
+  nav button.active { background: var(--accent); border-color: var(--accent); color: #082f49; font-weight: 700; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; margin-bottom: 14px;
+  }
+  .card h2 { margin: 0 0 12px; font-size: 17px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .row .label { width: 100%; color: var(--sub); font-size: 13px; margin-bottom: 2px; }
+  .chip {
+    padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--card2); color: var(--text); cursor: pointer; font-size: 14px;
+  }
+  .chip.sel { background: var(--accent2); border-color: var(--accent2); color: #1e1b4b; font-weight: 700; }
+  .start-btn, .next-btn {
+    width: 100%; padding: 14px; font-size: 17px; font-weight: 700;
+    border: none; border-radius: 12px; background: var(--accent); color: #082f49; cursor: pointer;
+  }
+  .next-btn { background: var(--accent2); color: #1e1b4b; }
+  /* quiz */
+  .quiz-top { display: flex; justify-content: space-between; color: var(--sub); font-size: 14px; margin-bottom: 6px; }
+  .progressbar { height: 6px; background: var(--card2); border-radius: 3px; overflow: hidden; margin-bottom: 20px; }
+  .progressbar div { height: 100%; background: var(--accent); transition: width .2s; }
+  .qtext { font-size: 30px; text-align: center; margin: 24px 0; line-height: 1.5; }
+  .qtext.small { font-size: 20px; }
+  .qtext sup { font-size: 60%; }
+  .answer-row { display: flex; gap: 8px; }
+  .answer-row input {
+    flex: 1; padding: 12px 14px; font-size: 20px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--card2); color: var(--text);
+  }
+  .answer-row input:focus { outline: 2px solid var(--accent); }
+  .answer-row button {
+    padding: 12px 20px; font-size: 16px; font-weight: 700; border: none;
+    border-radius: 10px; background: var(--accent); color: #082f49; cursor: pointer;
+  }
+  .unit { align-self: center; color: var(--sub); font-size: 16px; min-width: 30px; }
+  .hint { color: var(--sub); font-size: 12px; margin-top: 8px; }
+  .feedback { text-align: center; margin: 16px 0; font-size: 18px; }
+  .feedback .mark { font-size: 40px; display: block; margin-bottom: 6px; }
+  .feedback.ok .mark { color: var(--ok); }
+  .feedback.ng .mark { color: var(--ng); }
+  .note { background: var(--card2); border-radius: 10px; padding: 12px 14px; font-size: 14px; color: var(--text); margin: 12px 0; line-height: 1.7; }
+  .note b { color: var(--accent); }
+  /* result */
+  .score-big { font-size: 42px; text-align: center; margin: 10px 0; font-weight: 700; }
+  .score-sub { text-align: center; color: var(--sub); margin-bottom: 16px; }
+  .review { font-size: 14px; }
+  .review div { padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 10px; }
+  .review .q { color: var(--sub); }
+  .r-ok { color: var(--ok); } .r-ng { color: var(--ng); }
+  /* stats */
+  .statgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 4px; }
+  .stat { background: var(--card2); border-radius: 10px; padding: 12px; text-align: center; }
+  .stat .v { font-size: 24px; font-weight: 700; color: var(--accent); }
+  .stat .k { font-size: 12px; color: var(--sub); margin-top: 2px; }
+  .chart-wrap { overflow-x: auto; }
+  table.sess { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.sess th, table.sess td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  table.sess th { color: var(--sub); font-weight: normal; }
+  .muted { color: var(--sub); font-size: 14px; }
+  .danger { background: none; border: 1px solid var(--border); color: var(--sub); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🧮 暗算トレーナー</h1>
+    <span class="sub">暗算・近似計算の練習</span>
+  </header>
+  <nav>
+    <button id="tab-mental" class="active">暗算</button>
+    <button id="tab-approx">近似計算</button>
+    <button id="tab-stats">進捗</button>
+  </nav>
+  <main id="main"></main>
+</div>
+
+<script>
+"use strict";
+
+// ---------- storage ----------
+const STORE_KEY = "anzanTrainerV1";
+function loadStore() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || { sessions: [], bestStreak: 0 }; }
+  catch { return { sessions: [], bestStreak: 0 }; }
+}
+function saveStore(s) { localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+
+// ---------- helpers ----------
+const $ = sel => document.querySelector(sel);
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function pick(arr) { return arr[rand(0, arr.length - 1)]; }
+function sup(n) { return `<sup>${n}</sup>`; }
+function sci(m, e) { return `${m}×10${sup(e)}`; }
+
+// format a number for display (2-3 sig figs, scientific if large/small)
+function fmt(v) {
+  if (v === 0) return "0";
+  const a = Math.abs(v);
+  if (a >= 1e5 || a < 1e-2) {
+    const e = Math.floor(Math.log10(a));
+    let m = v / Math.pow(10, e);
+    m = Math.round(m * 100) / 100;
+    return `${m}×10${sup(e)}`;
+  }
+  const r = Math.round(v * 1000) / 1000;
+  return r.toLocaleString("ja-JP", { maximumFractionDigits: 3 });
+}
+
+// parse user numeric input: "1234", "2.4e9", "2.4×10^9", "3*10^5", "10^7"
+function parseNum(s) {
+  s = String(s).trim().replace(/,/g, "").replace(/\s+/g, "").replace(/－/g,"-").replace(/．/g,".");
+  s = s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  if (s === "") return NaN;
+  if (/^-?\d*\.?\d+$/.test(s)) return parseFloat(s);
+  let m = s.match(/^(-?\d*\.?\d+)[eE]([+-]?\d+)$/);
+  if (m) return parseFloat(m[1]) * Math.pow(10, parseInt(m[2]));
+  m = s.match(/^(-?\d*\.?\d+)[×xX*]10\^?([+-]?\d+)$/);
+  if (m) return parseFloat(m[1]) * Math.pow(10, parseInt(m[2]));
+  m = s.match(/^-?10\^([+-]?\d+)$/);
+  if (m) return (s.startsWith("-") ? -1 : 1) * Math.pow(10, parseInt(m[1]));
+  return NaN;
+}
+
+// ---------- mental math problems ----------
+function genMental(op, level) {
+  let realOp = op === "mix" ? pick(["add","sub","mul","div"]) : op;
+  let a, b, text, ans;
+  if (realOp === "dd") { // 二桁の九九（2桁×2桁）
+    if (level === "easy")   { a = rand(11, 19); b = rand(11, 19); }
+    if (level === "normal") { a = rand(11, 49); b = rand(11, 49); }
+    if (level === "hard")   { a = rand(11, 99); b = rand(11, 99); }
+    ans = a * b;
+    text = `${a} × ${b}`;
+    return { text, ans, isApprox: false };
+  }
+  if (realOp === "add" || realOp === "sub") {
+    if (level === "easy")   { a = rand(10, 99); b = rand(2, 9); }
+    if (level === "normal") { a = rand(10, 99); b = rand(10, 99); }
+    if (level === "hard")   { a = rand(100, 999); b = rand(100, 999); }
+    if (realOp === "sub" && b > a) [a, b] = [b, a];
+    ans = realOp === "add" ? a + b : a - b;
+    text = `${a} ${realOp === "add" ? "+" : "−"} ${b}`;
+  } else if (realOp === "mul") {
+    if (level === "easy")   { a = rand(2, 9); b = rand(2, 9); }
+    if (level === "normal") { a = rand(11, 99); b = rand(2, 9); }
+    if (level === "hard")   { a = rand(11, 99); b = rand(11, 99); }
+    ans = a * b;
+    text = `${a} × ${b}`;
+  } else { // div — always exact
+    let q;
+    if (level === "easy")   { b = rand(2, 9); q = rand(2, 9); }
+    if (level === "normal") { b = rand(2, 9); q = rand(11, 99); }
+    if (level === "hard")   { b = rand(11, 29); q = rand(11, 99); }
+    a = b * q; ans = q;
+    text = `${a} ÷ ${b}`;
+  }
+  return { text, ans, isApprox: false };
+}
+
+// ---------- approximation problems ----------
+function genNotation() {
+  const kind = pick(["mul", "div", "sq"]);
+  const m1 = rand(11, 99) / 10, e1 = rand(-4, 8);
+  const m2 = rand(11, 99) / 10, e2 = rand(-4, 8);
+  let text, ans;
+  if (kind === "mul") {
+    ans = m1 * Math.pow(10, e1) * m2 * Math.pow(10, e2);
+    text = `${sci(m1, e1)} × ${sci(m2, e2)} ≈ ?`;
+  } else if (kind === "div") {
+    ans = (m1 * Math.pow(10, e1)) / (m2 * Math.pow(10, e2));
+    text = `${sci(m1, e1)} ÷ ${sci(m2, e2)} ≈ ?`;
+  } else {
+    ans = Math.pow(m1 * Math.pow(10, e1), 2);
+    text = `(${sci(m1, e1)})${sup(2)} ≈ ?`;
+  }
+  return { text, ans, tol: 1.3, unit: "", isApprox: true,
+           note: `正確な値は <b>${fmt(ans)}</b>。仮数どうし・指数どうしを分けて計算するのがコツ。` };
+}
+
+const PHYSICS = [
+  { q: "光が太陽から地球まで届く時間は約何秒？（距離 1.5×10¹¹ m、光速 3×10⁸ m/s）",
+    ans: 500, unit: "s", tol: 1.5,
+    note: "1.5×10¹¹ ÷ 3×10⁸ = 0.5×10³ = <b>500 s</b>（約8分20秒）" },
+  { q: "光が地球を1周する時間は約何秒？（地球の円周 4×10⁷ m）",
+    ans: 0.13, unit: "s", tol: 1.5,
+    note: "4×10⁷ ÷ 3×10⁸ ≈ 1.3×10⁻¹ = <b>0.13 s</b>。1秒で7周半。" },
+  { q: "1年は約何秒？",
+    ans: 3.15e7, unit: "s", tol: 1.3,
+    note: "365 × 24 × 3600 ≈ <b>3.15×10⁷ s</b>。「π×10⁷ 秒」と覚えると便利。" },
+  { q: "音（340 m/s）が1 km進むのにかかる時間は約何秒？",
+    ans: 2.9, unit: "s", tol: 1.3,
+    note: "1000 ÷ 340 ≈ <b>3 s</b>。雷まで3秒なら約1km。" },
+  { q: "質量1000 kgの車が20 m/s（72 km/h）で走るときの運動エネルギーは約何J？",
+    ans: 2e5, unit: "J", tol: 1.5,
+    note: "½mv² = 0.5 × 1000 × 400 = <b>2×10⁵ J</b>" },
+  { q: "体重60 kgの人が高さ3 mから飛び降りたときの衝突エネルギーは約何J？（g≈10）",
+    ans: 1800, unit: "J", tol: 1.5,
+    note: "mgh = 60 × 10 × 3 = <b>1.8×10³ J</b>" },
+  { q: "100 Wの電球を24時間つけたときの消費エネルギーは約何J？",
+    ans: 8.6e6, unit: "J", tol: 1.5,
+    note: "100 × 86400 ≈ <b>8.6×10⁶ J</b>（= 2.4 kWh）。1日 ≈ 8.6×10⁴ s は覚えておくと速い。" },
+  { q: "水1 L（1 kg）を20℃から100℃まで温めるのに必要な熱量は約何J？（比熱 4200 J/kg·K）",
+    ans: 3.4e5, unit: "J", tol: 1.5,
+    note: "4200 × 80 ≈ <b>3.4×10⁵ J</b>" },
+  { q: "自由落下で5秒間に落ちる距離は約何m？（g≈10）",
+    ans: 125, unit: "m", tol: 1.3,
+    note: "½gt² = 0.5 × 10 × 25 = <b>125 m</b>" },
+  { q: "高さ20 mから物を落とすと地面に着くまで約何秒？（g≈10）",
+    ans: 2, unit: "s", tol: 1.3,
+    note: "t = √(2h/g) = √4 = <b>2 s</b>" },
+  { q: "1気圧の大気が1 m²の面を押す力は約何N？",
+    ans: 1e5, unit: "N", tol: 1.5,
+    note: "1気圧 ≈ <b>10⁵ N/m²(Pa)</b>。約10トンの重さに相当。" },
+  { q: "地球の周囲（赤道1周）の長さは約何m？",
+    ans: 4e7, unit: "m", tol: 1.3,
+    note: "<b>4×10⁷ m</b>（4万km）。メートルの定義の由来。" },
+  { q: "人の心臓は1日に約何回打つ？（毎分70回として）",
+    ans: 1e5, unit: "回", tol: 2,
+    note: "70 × 60 × 24 ≈ <b>1×10⁵ 回</b>" },
+  { q: "体重60 kgの人が富士山頂（標高3776 m）まで登るときに稼ぐ位置エネルギーは約何J？（g≈10）",
+    ans: 2.3e6, unit: "J", tol: 1.5,
+    note: "mgh ≈ 60 × 10 × 3800 ≈ <b>2.3×10⁶ J</b>（約540 kcal）" },
+  { q: "時速250 kmの新幹線で東京–新大阪 550 kmは約何時間？",
+    ans: 2.2, unit: "時間", tol: 1.3,
+    note: "550 ÷ 250 = <b>2.2 時間</b>" },
+  { q: "時速100 kmの車で地球1周（4万km）を走ると約何日かかる？",
+    ans: 17, unit: "日", tol: 1.5,
+    note: "40000 ÷ 100 = 400時間 ≈ <b>17 日</b>" },
+
+  // --- 電磁気 ---
+  { q: "1000 μF のコンデンサに 10 V かけたとき蓄えられる電荷は約何C？（Q=CV）",
+    ans: 1e-2, unit: "C", tol: 1.3,
+    note: "Q = CV = 10⁻³ × 10 = <b>10⁻² C</b>。μ（マイクロ）= 10⁻⁶。" },
+  { q: "100 μF のコンデンサに 100 V かけたとき蓄えられるエネルギーは約何J？（½CV²）",
+    ans: 0.5, unit: "J", tol: 1.3,
+    note: "½CV² = 0.5 × 10⁻⁴ × 10⁴ = <b>0.5 J</b>" },
+  { q: "電流 2 A が流れる導線を1秒間に通過する電子の数は約何個？（素電荷 1.6×10⁻¹⁹ C）",
+    ans: 1.25e19, unit: "個", tol: 1.5,
+    note: "N = It/e = 2 ÷ 1.6×10⁻¹⁹ ≈ <b>1.25×10¹⁹ 個</b>" },
+  { q: "100 V・10 A で動く電子レンジの消費電力は約何W？",
+    ans: 1000, unit: "W", tol: 1.3,
+    note: "P = VI = 100 × 10 = <b>1000 W</b>" },
+  { q: "抵抗 100 Ω に 10 V かけたとき流れる電流は約何A？（オームの法則）",
+    ans: 0.1, unit: "A", tol: 1.3,
+    note: "I = V/R = 10 ÷ 100 = <b>0.1 A</b>" },
+  { q: "スマホのバッテリー 3000 mAh を 500 mA で使い切るのに約何時間？",
+    ans: 6, unit: "時間", tol: 1.3,
+    note: "3000 ÷ 500 = <b>6 時間</b>" },
+
+  // --- 天文 ---
+  { q: "地球の脱出速度は約何 m/s？（半径 6.4×10⁶ m、GM≈4×10¹⁴）",
+    ans: 1.1e4, unit: "m/s", tol: 1.3,
+    note: "v=√(2GM/R)=√(2×4×10¹⁴/6.4×10⁶)≈√(1.25×10⁸)≈<b>1.1×10⁴ m/s</b>（約11 km/s）" },
+  { q: "太陽の全放射出力（光度）は約何W？（地球軌道で 1360 W/m²、距離 1.5×10¹¹ m）",
+    ans: 3.8e26, unit: "W", tol: 2,
+    note: "P = 1360 × 4π×(1.5×10¹¹)² ≈ <b>3.8×10²⁶ W</b>" },
+  { q: "地球の質量は約何 kg？（半径 6.4×10⁶ m、g=9.8、G=6.7×10⁻¹¹）",
+    ans: 6e24, unit: "kg", tol: 1.5,
+    note: "M = gR²/G ≈ 9.8×(6.4×10⁶)²/6.7×10⁻¹¹ ≈ <b>6×10²⁴ kg</b>" },
+  { q: "1光年は約何m？（光速 3×10⁸ m/s、1年≈3.15×10⁷ s）",
+    ans: 9.5e15, unit: "m", tol: 1.3,
+    note: "3×10⁸ × 3.15×10⁷ ≈ <b>9.5×10¹⁵ m</b>（約9.5兆km）" },
+  { q: "地球が太陽を回る公転速度は約何 m/s？（軌道半径 1.5×10¹¹ m、1年≈3.15×10⁷ s）",
+    ans: 3e4, unit: "m/s", tol: 1.3,
+    note: "2π×1.5×10¹¹ ÷ 3.15×10⁷ ≈ <b>3×10⁴ m/s</b>（約30 km/s）" },
+  { q: "国際宇宙ステーション（高度約400 km、v≈7.7 km/s）が地球を1周する時間は約何分？",
+    ans: 92, unit: "分", tol: 1.3,
+    note: "周長2π×6.8×10⁶ ÷ 7700 ≈ 5500 s ≈ <b>92 分</b>" },
+
+  // --- 原子・分子スケール ---
+  { q: "水18 g（1 mol）に含まれる分子の数は約何個？（アボガドロ数）",
+    ans: 6e23, unit: "個", tol: 1.3,
+    note: "アボガドロ数 <b>≈ 6×10²³ 個/mol</b>" },
+  { q: "炭素12 g に含まれる原子の数は約何個？",
+    ans: 6e23, unit: "個", tol: 1.3,
+    note: "12 g = 1 mol なので <b>6×10²³ 個</b>" },
+  { q: "水分子1個の質量は約何 kg？（18 g/mol、アボガドロ数 6×10²³）",
+    ans: 3e-26, unit: "kg", tol: 1.5,
+    note: "0.018 ÷ 6×10²³ ≈ <b>3×10⁻²⁶ kg</b>" },
+  { q: "1個の光子（波長500 nm）のエネルギーは約何J？（hc≈2×10⁻²⁵ J·m）",
+    ans: 4e-19, unit: "J", tol: 1.5,
+    note: "E=hc/λ = 2×10⁻²⁵ ÷ 5×10⁻⁷ = <b>4×10⁻¹⁹ J</b>（約2.5 eV）" },
+  { q: "コップ1杯の水（200 g）に含まれる水分子は約何個？",
+    ans: 6.7e24, unit: "個", tol: 1.5,
+    note: "200/18 ≈ 11 mol → 11 × 6×10²³ ≈ <b>6.7×10²⁴ 個</b>" },
+  { q: "1気圧・0℃で気体1 molが占める体積は約何L？",
+    ans: 22.4, unit: "L", tol: 1.3,
+    note: "標準状態のモル体積 <b>≈ 22.4 L</b>" },
+
+  // --- 生物・生体分子 ---
+  { q: "ヒトの体（約37兆個の細胞）の細胞数は約何個？",
+    ans: 3.7e13, unit: "個", tol: 3,
+    note: "ヒトの細胞数 <b>≈ 3.7×10¹³ 個</b>（数十兆オーダー）" },
+  { q: "大腸菌（長さ約2 μm）は1 mm に約何個並ぶ？",
+    ans: 500, unit: "個", tol: 1.5,
+    note: "10⁻³ ÷ 2×10⁻⁶ = <b>500 個</b>" },
+  { q: "ヒトゲノムの塩基対数は約何個？",
+    ans: 3e9, unit: "塩基対", tol: 1.5,
+    note: "ヒトゲノム <b>≈ 3×10⁹ 塩基対</b>（約30億）" },
+  { q: "ヒト1人が1日に消費するエネルギー（約2000 kcal）は約何J？（1 cal≈4.2 J）",
+    ans: 8.4e6, unit: "J", tol: 1.3,
+    note: "2×10⁶ cal × 4.2 ≈ <b>8.4×10⁶ J</b>。基礎代謝はおよそ100 Wの電球分。" },
+  { q: "赤血球（直径約8 μm）はヒトに約25兆個。全部一列に並べると約何m？",
+    ans: 2e8, unit: "m", tol: 2,
+    note: "8×10⁻⁶ × 2.5×10¹³ ≈ <b>2×10⁸ m</b>（地球5周分）" },
+  { q: "細胞1個のATP（エネルギー通貨）は1日で約何回リサイクルされる？（体重分のATPを毎日作り替える）",
+    ans: 1000, unit: "回", tol: 3,
+    note: "体内ATPは数十g程度だが1日で体重分（数十kg）合成 → <b>約10³ 回</b>回転。桁感覚の練習。" },
+  { q: "ヒトの脳のニューロン数は約何個？",
+    ans: 8.6e10, unit: "個", tol: 2,
+    note: "大脳を含む脳全体で <b>≈ 8.6×10¹⁰ 個</b>（約860億）" },
+];
+
+function genPhysics(used) {
+  let cand = PHYSICS.filter((_, i) => !used.has(i));
+  if (cand.length === 0) { used.clear(); cand = PHYSICS.slice(); }
+  const p = pick(cand);
+  used.add(PHYSICS.indexOf(p));
+  return { text: p.q, ans: p.ans, tol: p.tol, unit: p.unit, note: p.note, isApprox: true, isPhysics: true };
+}
+
+// ---------- app state ----------
+let tab = "mental";
+let mentalOp = "mix", mentalLevel = "normal";
+let quiz = null; // {mode, questions, idx, results:[], streak, qStart, timerId}
+
+// ---------- views ----------
+function switchTab(t) {
+  if (quiz && quiz.timerId) clearInterval(quiz.timerId);
+  document.removeEventListener("keydown", enterNext);
+  quiz = null;
+  tab = t;
+  ["mental","approx","stats"].forEach(x =>
+    $("#tab-" + x).classList.toggle("active", x === t));
+  render();
+}
+$("#tab-mental").onclick = () => switchTab("mental");
+$("#tab-approx").onclick = () => switchTab("approx");
+$("#tab-stats").onclick  = () => switchTab("stats");
+
+function render() {
+  if (quiz) return; // quiz screens render themselves
+  if (tab === "mental") renderMentalSetup();
+  else if (tab === "approx") renderApproxSetup();
+  else renderStats();
+}
+
+function renderMentalSetup() {
+  const ops = [["add","たし算"],["sub","ひき算"],["mul","かけ算"],["div","わり算"],["dd","二桁の九九"],["mix","ミックス"]];
+  const lvls = [["easy","かんたん"],["normal","ふつう"],["hard","むずかしい"]];
+  $("#main").innerHTML = `
+    <div class="card">
+      <h2>暗算練習（全10問）</h2>
+      <div class="row"><span class="label">種類</span>
+        ${ops.map(([v,l]) => `<button class="chip ${mentalOp===v?"sel":""}" data-op="${v}">${l}</button>`).join("")}
+      </div>
+      <div class="row"><span class="label">レベル</span>
+        ${lvls.map(([v,l]) => `<button class="chip ${mentalLevel===v?"sel":""}" data-lvl="${v}">${l}</button>`).join("")}
+      </div>
+      <button class="start-btn" id="start">スタート</button>
+      <p class="hint">Enterキーで解答できます。正確に、速く！</p>
+    </div>`;
+  document.querySelectorAll("[data-op]").forEach(b => b.onclick = () => { mentalOp = b.dataset.op; renderMentalSetup(); });
+  document.querySelectorAll("[data-lvl]").forEach(b => b.onclick = () => { mentalLevel = b.dataset.lvl; renderMentalSetup(); });
+  $("#start").onclick = startMental;
+}
+
+function renderApproxSetup() {
+  $("#main").innerHTML = `
+    <div class="card">
+      <h2>近似計算・物理概算（全8問）</h2>
+      <p class="muted">指数計算のドリルと、物理のフェルミ推定がミックスで出題されます。
+      答えが正解の <b>±30%〜数倍以内</b>（問題による）なら正解です。</p>
+      <p class="muted">入力例: <code>500</code> / <code>3.2e5</code> / <code>3.2×10^5</code> / <code>10^7</code></p>
+      <button class="start-btn" id="start">スタート</button>
+    </div>`;
+  $("#start").onclick = startApprox;
+}
+
+// ---------- quiz flow ----------
+function startMental() {
+  const qs = [];
+  for (let i = 0; i < 10; i++) qs.push(genMental(mentalOp, mentalLevel));
+  quiz = { mode: "mental", questions: qs, idx: 0, results: [], streak: 0 };
+  showQuestion();
+}
+
+function startApprox() {
+  const used = new Set();
+  const qs = [];
+  for (let i = 0; i < 8; i++) {
+    qs.push(i % 2 === 0 ? genNotation() : genPhysics(used));
+  }
+  // shuffle
+  for (let i = qs.length - 1; i > 0; i--) {
+    const j = rand(0, i); [qs[i], qs[j]] = [qs[j], qs[i]];
+  }
+  quiz = { mode: "approx", questions: qs, idx: 0, results: [], streak: 0 };
+  showQuestion();
+}
+
+function showQuestion() {
+  const q = quiz.questions[quiz.idx];
+  const n = quiz.questions.length;
+  $("#main").innerHTML = `
+    <div class="card">
+      <div class="quiz-top">
+        <span>第 ${quiz.idx + 1} / ${n} 問</span>
+        <span id="timer">0.0 s</span>
+      </div>
+      <div class="progressbar"><div style="width:${(quiz.idx / n) * 100}%"></div></div>
+      <div class="qtext ${q.isPhysics ? "small" : ""}">${q.text}${q.isApprox && !q.isPhysics ? "" : ""}</div>
+      <div class="answer-row">
+        <input id="ans" type="text" inputmode="${q.isApprox ? "text" : "numeric"}" enterkeyhint="done" autocomplete="off" placeholder="${q.isApprox ? "例: 3.2e5" : "答え"}">
+        ${q.unit ? `<span class="unit">${q.unit}</span>` : ""}
+        <button id="submit">解答</button>
+      </div>
+      ${q.isApprox ? `<p class="hint">近似でOK（正解の${q.tol <= 1.3 ? "±30%" : "数倍"}以内で正解）</p>` : ""}
+      <div id="fb"></div>
+    </div>`;
+  quiz.qStart = performance.now();
+  quiz.timerId = setInterval(() => {
+    const t = (performance.now() - quiz.qStart) / 1000;
+    const el = $("#timer");
+    if (el) el.textContent = t.toFixed(1) + " s";
+  }, 100);
+  const input = $("#ans");
+  input.focus();
+  input.addEventListener("keydown", e => { if (e.key === "Enter") submitAnswer(); });
+  $("#submit").onclick = submitAnswer;
+}
+
+function submitAnswer() {
+  const q = quiz.questions[quiz.idx];
+  const raw = $("#ans").value;
+  const val = parseNum(raw);
+  if (isNaN(val)) { $("#ans").focus(); return; }
+  clearInterval(quiz.timerId);
+  const ms = performance.now() - quiz.qStart;
+
+  let ok;
+  if (q.isApprox) {
+    ok = val !== 0 && Math.sign(val) === Math.sign(q.ans) &&
+         Math.max(Math.abs(val / q.ans), Math.abs(q.ans / val)) <= q.tol;
+  } else {
+    ok = val === q.ans;
+  }
+  quiz.results.push({ q: q.text, ans: q.ans, given: raw, ok, ms, unit: q.unit || "" });
+  quiz.streak = ok ? quiz.streak + 1 : 0;
+  const store = loadStore();
+  if (quiz.streak > store.bestStreak) { store.bestStreak = quiz.streak; saveStore(store); }
+
+  $("#ans").disabled = true;
+  $("#submit").disabled = true;
+
+  const fb = $("#fb");
+  if (q.isApprox) {
+    fb.innerHTML = `
+      <div class="feedback ${ok ? "ok" : "ng"}">
+        <span class="mark">${ok ? "○" : "✕"}</span>
+        ${ok ? "正解！" : "残念"}　正解: <b>${fmt(q.ans)}${q.unit ? " " + q.unit : ""}</b>
+      </div>
+      <div class="note">${q.note}</div>
+      <button class="next-btn" id="next">${quiz.idx + 1 < quiz.questions.length ? "次の問題へ (Enter)" : "結果を見る (Enter)"}</button>`;
+    const nextBtn = $("#next");
+    nextBtn.onclick = nextQuestion;
+    nextBtn.focus();
+    document.addEventListener("keydown", enterNext);
+  } else {
+    fb.innerHTML = `
+      <div class="feedback ${ok ? "ok" : "ng"}">
+        <span class="mark">${ok ? "○" : "✕"}</span>
+        ${ok ? "正解！" : `正解は <b>${q.ans}</b>`}
+      </div>`;
+    setTimeout(nextQuestion, ok ? 700 : 1600);
+  }
+}
+
+function enterNext(e) {
+  if (e.key === "Enter") {
+    e.preventDefault(); // ボタンのデフォルト発火と重なって二重進行するのを防ぐ
+    document.removeEventListener("keydown", enterNext);
+    nextQuestion();
+  }
+}
+
+function nextQuestion() {
+  document.removeEventListener("keydown", enterNext);
+  if (!quiz) return;
+  quiz.idx++;
+  if (quiz.idx < quiz.questions.length) showQuestion();
+  else finishQuiz();
+}
+
+function finishQuiz() {
+  const rs = quiz.results;
+  const correct = rs.filter(r => r.ok).length;
+  const avgMs = rs.reduce((s, r) => s + r.ms, 0) / rs.length;
+  const store = loadStore();
+  store.sessions.push({ d: todayStr(), mode: quiz.mode, correct, total: rs.length, avgMs: Math.round(avgMs) });
+  saveStore(store);
+
+  const modeLabel = quiz.mode === "mental" ? "暗算" : "近似計算";
+  $("#main").innerHTML = `
+    <div class="card">
+      <h2>${modeLabel} — 結果</h2>
+      <div class="score-big">${correct} / ${rs.length}</div>
+      <div class="score-sub">平均解答時間 ${(avgMs / 1000).toFixed(1)} 秒</div>
+      <div class="review">
+        ${rs.map(r => `<div>
+          <span class="q">${r.q.length > 40 ? r.q.slice(0, 38) + "…" : r.q}</span>
+          <span class="${r.ok ? "r-ok" : "r-ng"}">${r.ok ? "○" : "✕ (" + r.given + " → " + fmt(r.ans) + ")"}</span>
+        </div>`).join("")}
+      </div>
+      <div style="display:flex; gap:8px; margin-top:16px;">
+        <button class="start-btn" id="again">もう一度</button>
+        <button class="next-btn" id="tostats">進捗を見る</button>
+      </div>
+    </div>`;
+  const mode = quiz.mode;
+  quiz = null;
+  $("#again").onclick = () => mode === "mental" ? startMental() : startApprox();
+  $("#tostats").onclick = () => switchTab("stats");
+}
+
+// ---------- stats ----------
+function renderStats() {
+  const store = loadStore();
+  const ss = store.sessions;
+  if (ss.length === 0) {
+    $("#main").innerHTML = `<div class="card"><h2>進捗</h2>
+      <p class="muted">まだ記録がありません。まずは1セッション解いてみましょう！</p></div>`;
+    return;
+  }
+  const agg = mode => {
+    const m = ss.filter(s => s.mode === mode);
+    const total = m.reduce((s, x) => s + x.total, 0);
+    const correct = m.reduce((s, x) => s + x.correct, 0);
+    const avg = m.length ? m.reduce((s, x) => s + x.avgMs, 0) / m.length : 0;
+    return { n: m.length, total, correct, acc: total ? Math.round(correct / total * 100) : 0, avg };
+  };
+  const me = agg("mental"), ap = agg("approx");
+
+  // last 14 days chart
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+    const dayS = ss.filter(s => s.d === key);
+    days.push({
+      label: (d.getMonth()+1) + "/" + d.getDate(),
+      total: dayS.reduce((s, x) => s + x.total, 0),
+      correct: dayS.reduce((s, x) => s + x.correct, 0),
+    });
+  }
+  const maxT = Math.max(1, ...days.map(d => d.total));
+  const W = 600, H = 160, bw = W / 14;
+  const bars = days.map((d, i) => {
+    const hT = d.total / maxT * (H - 30);
+    const hC = d.correct / maxT * (H - 30);
+    const x = i * bw + 6;
+    return `
+      <rect x="${x}" y="${H - 20 - hT}" width="${bw - 12}" height="${hT}" fill="#334155" rx="3"/>
+      <rect x="${x}" y="${H - 20 - hC}" width="${bw - 12}" height="${hC}" fill="#38bdf8" rx="3"/>
+      ${d.total ? `<text x="${x + (bw-12)/2}" y="${H - 24 - hT}" fill="#94a3b8" font-size="10" text-anchor="middle">${d.total}</text>` : ""}
+      <text x="${x + (bw-12)/2}" y="${H - 6}" fill="#64748b" font-size="9" text-anchor="middle">${d.label}</text>`;
+  }).join("");
+
+  const recent = ss.slice(-8).reverse();
+  $("#main").innerHTML = `
+    <div class="card">
+      <h2>全体</h2>
+      <div class="statgrid">
+        <div class="stat"><div class="v">${me.total + ap.total}</div><div class="k">総回答数</div></div>
+        <div class="stat"><div class="v">${store.bestStreak}</div><div class="k">最高連続正解</div></div>
+        <div class="stat"><div class="v">${me.acc}%</div><div class="k">暗算 正答率（${me.total}問）</div></div>
+        <div class="stat"><div class="v">${ap.acc}%</div><div class="k">近似計算 正答率（${ap.total}問）</div></div>
+        <div class="stat"><div class="v">${me.n ? (me.avg/1000).toFixed(1) + "s" : "–"}</div><div class="k">暗算 平均解答時間</div></div>
+        <div class="stat"><div class="v">${ap.n ? (ap.avg/1000).toFixed(1) + "s" : "–"}</div><div class="k">近似計算 平均解答時間</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>直近14日の回答数 <span class="muted" style="font-weight:normal;font-size:12px">（水色=正解）</span></h2>
+      <div class="chart-wrap"><svg viewBox="0 0 ${W} ${H}" width="100%">${bars}</svg></div>
+    </div>
+    <div class="card">
+      <h2>最近のセッション</h2>
+      <table class="sess">
+        <tr><th>日付</th><th>モード</th><th>スコア</th><th>平均時間</th></tr>
+        ${recent.map(s => `<tr>
+          <td>${s.d.slice(5)}</td>
+          <td>${s.mode === "mental" ? "暗算" : "近似計算"}</td>
+          <td>${s.correct}/${s.total}</td>
+          <td>${(s.avgMs/1000).toFixed(1)}s</td>
+        </tr>`).join("")}
+      </table>
+      <button class="danger" id="reset">記録をすべて削除</button>
+    </div>`;
+  $("#reset").onclick = () => {
+    if (confirm("進捗の記録をすべて削除しますか？")) { localStorage.removeItem(STORE_KEY); renderStats(); }
+  };
+}
+
+render();
+</script>
+</body>
+</html>
