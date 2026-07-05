@@ -172,17 +172,88 @@ function parseNum(s) {
   return NaN;
 }
 
+// ---------- mental math tips ----------
+function mulTip(a, b, ans) {
+  const ta = Math.floor(a / 10), ua = a % 10;
+  const tb = Math.floor(b / 10), ub = b % 10;
+  if (a >= 10 && b >= 10) {
+    // インド式: 十の位が同じ・一の位の和が10
+    if (ta === tb && ua + ub === 10)
+      return `十の位が同じ＆一の位の和が10 →「${ta}×${ta + 1}=${ta * (ta + 1)}」と「${ua}×${ub}=${String(ua * ub).padStart(2, "0")}」を並べて <b>${ans}</b>（インド式）`;
+    // 11〜19どうし
+    if (a <= 19 && b <= 19)
+      return `11〜19どうし: ${a}+${ub}=${a + ub} を10倍して ${(a + ub) * 10}、一の位どうし ${ua}×${ub}=${ua * ub} を足して <b>${ans}</b>`;
+    // 差が2 → 和と差の積
+    if (Math.abs(a - b) === 2) {
+      const m = (a + b) / 2;
+      return `${Math.max(a,b)}×${Math.min(a,b)} = ${m}² − 1 = ${m * m} − 1 = <b>${ans}</b>（和と差の積）`;
+    }
+    // 100近傍（不足分の積が2桁に収まるときだけ、桁の並べ方がそのまま使える）
+    if (a >= 85 && b >= 85 && (100 - a) * (100 - b) < 100) {
+      const d1 = 100 - a, d2 = 100 - b;
+      return `100からの不足は ${d1} と ${d2} → 前半 ${a}−${d2}=${a - d2}、後半 ${d1}×${d2}=${String(d1 * d2).padStart(2, "0")} で <b>${ans}</b>（100近傍の術）`;
+    }
+    // 一の位が0/9/1のときの丸めテク（bに寄せる）
+    let x = a, y = b;
+    if (a % 10 === 0 || a % 10 === 9 || a % 10 === 1) { x = b; y = a; }
+    const ty = Math.floor(y / 10), uy = y % 10;
+    if (uy === 0) return `${x}×${y} = ${x}×${ty}×10 = ${x * ty}×10 = <b>${ans}</b>`;
+    if (uy === 9) return `${x}×${y} = ${x}×${y + 1} − ${x} = ${x * (y + 1)} − ${x} = <b>${ans}</b>`;
+    if (uy === 1) return `${x}×${y} = ${x}×${ty}×10 + ${x} = ${x * ty * 10} + ${x} = <b>${ans}</b>`;
+    // デフォルト: 分配法則
+    return `${x}×${y} = ${x}×${ty * 10} + ${x}×${uy} = ${x * ty * 10} + ${x * uy} = <b>${ans}</b>（分配法則）`;
+  }
+  if (a < 10 && b < 10) return `九九は反射で出るまで反復あるのみ！`;
+  const big = a >= 10 ? a : b, sm = a >= 10 ? b : a;
+  if (big % 10 === 0) return `${big}×${sm} = ${big / 10}×${sm}×10 = ${(big / 10) * sm}×10 = <b>${ans}</b>`;
+  if (sm === 9) return `${big}×9 = ${big}×10 − ${big} = ${big * 10} − ${big} = <b>${ans}</b>`;
+  if (sm === 5) return `${big}×5 = ${big}×10 ÷ 2 = ${big * 10}÷2 = <b>${ans}</b>`;
+  const tbig = Math.floor(big / 10) * 10, ubig = big % 10;
+  return `${big}×${sm} = ${tbig}×${sm} + ${ubig}×${sm} = ${tbig * sm} + ${ubig * sm} = <b>${ans}</b>（分配法則）`;
+}
+
+function addTip(a, b, ans) {
+  const ub = b % 10, ua = a % 10;
+  if (ub >= 7) {
+    const r = 10 - ub;
+    return `${b} を ${b + r} に丸めて ${a}+${b + r}=${a + b + r}、足しすぎた ${r} を引いて <b>${ans}</b>`;
+  }
+  if (ua >= 7) {
+    const r = 10 - ua;
+    return `${a} を ${a + r} に丸めて ${a + r}+${b}=${a + b + r}、足しすぎた ${r} を引いて <b>${ans}</b>`;
+  }
+  const taP = Math.floor(a / 10) * 10, tbP = Math.floor(b / 10) * 10;
+  return `キリのいい部分と端数に分ける: (${taP}+${tbP}) + (${ua}+${ub}) = ${taP + tbP} + ${ua + ub} = <b>${ans}</b>`;
+}
+
+function subTip(a, b, ans) {
+  const ub = b % 10, ua = a % 10;
+  if (ub > ua) {
+    const r = 10 - ub;
+    return `${b} を ${b + r} に丸めて引く: ${a}−${b + r}=${a - b - r}、引きすぎた ${r} を戻して <b>${ans}</b>（繰り下がり回避）`;
+  }
+  const tbP = Math.floor(b / 10) * 10;
+  return `十の位から先に: ${a}−${tbP}=${a - tbP}、そこから ${ub} を引いて <b>${ans}</b>`;
+}
+
+function divTip(a, b, q) {
+  if (q < 10) return `九九の逆: ${b}×${q} = ${a}`;
+  const t = Math.floor(q / 10) * 10;
+  return `見当をつける: ${b}×${t}=${b * t}。残り ${a - b * t} は ${b}×${q - t} → 合わせて <b>${q}</b>`;
+}
+
 // ---------- mental math problems ----------
 function genMental(op, level) {
   let realOp = op === "mix" ? pick(["add","sub","mul","div"]) : op;
   let a, b, text, ans;
+  let tip;
   if (realOp === "dd") { // 二桁の九九（2桁×2桁）
     if (level === "easy")   { a = rand(11, 19); b = rand(11, 19); }
     if (level === "normal") { a = rand(11, 49); b = rand(11, 49); }
     if (level === "hard")   { a = rand(11, 99); b = rand(11, 99); }
     ans = a * b;
     text = `${a} × ${b}`;
-    return { text, ans, isApprox: false };
+    return { text, ans, tip: mulTip(a, b, ans), isApprox: false };
   }
   if (realOp === "add" || realOp === "sub") {
     if (level === "easy")   { a = rand(10, 99); b = rand(2, 9); }
@@ -191,12 +262,14 @@ function genMental(op, level) {
     if (realOp === "sub" && b > a) [a, b] = [b, a];
     ans = realOp === "add" ? a + b : a - b;
     text = `${a} ${realOp === "add" ? "+" : "−"} ${b}`;
+    tip = realOp === "add" ? addTip(a, b, ans) : subTip(a, b, ans);
   } else if (realOp === "mul") {
     if (level === "easy")   { a = rand(2, 9); b = rand(2, 9); }
     if (level === "normal") { a = rand(11, 99); b = rand(2, 9); }
     if (level === "hard")   { a = rand(11, 99); b = rand(11, 99); }
     ans = a * b;
     text = `${a} × ${b}`;
+    tip = mulTip(a, b, ans);
   } else { // div — always exact
     let q;
     if (level === "easy")   { b = rand(2, 9); q = rand(2, 9); }
@@ -204,8 +277,9 @@ function genMental(op, level) {
     if (level === "hard")   { b = rand(11, 29); q = rand(11, 99); }
     a = b * q; ans = q;
     text = `${a} ÷ ${b}`;
+    tip = divTip(a, b, q);
   }
-  return { text, ans, isApprox: false };
+  return { text, ans, tip, isApprox: false };
 }
 
 // ---------- approximation problems ----------
@@ -516,14 +590,28 @@ function submitAnswer() {
     const nextBtn = $("#next");
     nextBtn.onclick = nextQuestion;
     nextBtn.focus();
-    document.addEventListener("keydown", enterNext);
-  } else {
+    setTimeout(() => document.addEventListener("keydown", enterNext), 0);
+  } else if (!ok || ms > 5000) {
+    // 間違えたか時間がかかった → コツを表示してじっくり読ませる
     fb.innerHTML = `
       <div class="feedback ${ok ? "ok" : "ng"}">
         <span class="mark">${ok ? "○" : "✕"}</span>
-        ${ok ? "正解！" : `正解は <b>${q.ans}</b>`}
+        ${ok ? `正解！ただ ${(ms / 1000).toFixed(1)} 秒。コツで時短:` : `正解は <b>${q.ans}</b>`}
+      </div>
+      ${q.tip ? `<div class="note">💡 ${q.tip}</div>` : ""}
+      <button class="next-btn" id="next">${quiz.idx + 1 < quiz.questions.length ? "次の問題へ (Enter)" : "結果を見る (Enter)"}</button>`;
+    const nextBtn = $("#next");
+    nextBtn.onclick = nextQuestion;
+    nextBtn.focus();
+    // 解答のEnterがバブルして即発火しないよう、登録は次のイベントループで
+    setTimeout(() => document.addEventListener("keydown", enterNext), 0);
+  } else {
+    fb.innerHTML = `
+      <div class="feedback ok">
+        <span class="mark">○</span>
+        正解！
       </div>`;
-    setTimeout(nextQuestion, ok ? 700 : 1600);
+    setTimeout(nextQuestion, 700);
   }
 }
 
@@ -574,13 +662,83 @@ function finishQuiz() {
   $("#tostats").onclick = () => switchTab("stats");
 }
 
+// ---------- backup (export / import) ----------
+function backupCardHTML() {
+  return `
+    <div class="card">
+      <h2>バックアップ</h2>
+      <p class="muted">記録をJSONファイルとして保存・復元できます。別の端末への引っ越しにも使えます（読み込みは既存の記録と合体し、重複は自動でスキップ）。</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="chip" id="export">書き出し（ダウンロード）</button>
+        <button class="chip" id="import">読み込み（復元）</button>
+        <input type="file" id="importfile" accept=".json,application/json" style="display:none">
+      </div>
+      <p class="hint" id="backup-msg"></p>
+    </div>`;
+}
+
+function bindBackupHandlers() {
+  $("#export").onclick = () => {
+    const blob = new Blob([JSON.stringify(loadStore(), null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `anzan-backup-${todayStr()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    $("#backup-msg").textContent = "バックアップファイルをダウンロードしました。";
+  };
+  $("#import").onclick = () => $("#importfile").click();
+  $("#importfile").onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = mergeBackup(reader.result);
+      if (result.error) {
+        $("#backup-msg").textContent = "読み込めませんでした: " + result.error;
+      } else {
+        renderStats();
+        $("#backup-msg").textContent = `読み込みました（セッション${result.added}件を追加、重複${result.skipped}件をスキップ）。`;
+      }
+    };
+    reader.readAsText(file);
+  };
+}
+
+function mergeBackup(text) {
+  let data;
+  try { data = JSON.parse(text); }
+  catch { return { error: "JSONとして読めないファイルです" }; }
+  if (!data || !Array.isArray(data.sessions)) return { error: "このアプリのバックアップ形式ではありません" };
+  const cur = loadStore();
+  const seen = new Set(cur.sessions.map(s => JSON.stringify(s)));
+  let added = 0, skipped = 0;
+  for (const s of data.sessions) {
+    const valid = s && typeof s.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.d) &&
+      (s.mode === "mental" || s.mode === "approx") &&
+      typeof s.correct === "number" && typeof s.total === "number" && typeof s.avgMs === "number";
+    if (!valid) { skipped++; continue; }
+    const rec = { d: s.d, mode: s.mode, correct: s.correct, total: s.total, avgMs: s.avgMs };
+    const key = JSON.stringify(rec);
+    if (seen.has(key)) { skipped++; continue; }
+    cur.sessions.push(rec);
+    seen.add(key);
+    added++;
+  }
+  cur.sessions.sort((a, b) => a.d < b.d ? -1 : a.d > b.d ? 1 : 0);
+  cur.bestStreak = Math.max(cur.bestStreak || 0, typeof data.bestStreak === "number" ? data.bestStreak : 0);
+  saveStore(cur);
+  return { added, skipped };
+}
+
 // ---------- stats ----------
 function renderStats() {
   const store = loadStore();
   const ss = store.sessions;
   if (ss.length === 0) {
     $("#main").innerHTML = `<div class="card"><h2>進捗</h2>
-      <p class="muted">まだ記録がありません。まずは1セッション解いてみましょう！</p></div>`;
+      <p class="muted">まだ記録がありません。まずは1セッション解いてみましょう！</p></div>` + backupCardHTML();
+    bindBackupHandlers();
     return;
   }
   const agg = mode => {
@@ -646,7 +804,8 @@ function renderStats() {
         </tr>`).join("")}
       </table>
       <button class="danger" id="reset">記録をすべて削除</button>
-    </div>`;
+    </div>` + backupCardHTML();
+  bindBackupHandlers();
   $("#reset").onclick = () => {
     if (confirm("進捗の記録をすべて削除しますか？")) { localStorage.removeItem(STORE_KEY); renderStats(); }
   };
