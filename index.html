@@ -100,6 +100,13 @@
   .stat .v { font-size: 24px; font-weight: 700; color: var(--accent); }
   .stat .k { font-size: 12px; color: var(--sub); margin-top: 2px; }
   .chart-wrap { overflow-x: auto; }
+  .catrow { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
+  .catrow .cl { width: 82px; color: var(--sub); flex-shrink: 0; }
+  .catrow .cb { flex: 1; height: 10px; background: var(--card2); border-radius: 5px; overflow: hidden; }
+  .catrow .cb div { height: 100%; background: var(--accent); border-radius: 5px; }
+  .catrow .cb div.low { background: var(--ng); }
+  .catrow .cb div.mid { background: #fbbf24; }
+  .catrow .cv { width: 90px; text-align: right; flex-shrink: 0; }
   table.sess { width: 100%; border-collapse: collapse; font-size: 13px; }
   table.sess th, table.sess td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
   table.sess th { color: var(--sub); font-weight: normal; }
@@ -253,7 +260,7 @@ function genMental(op, level) {
     if (level === "hard")   { a = rand(11, 99); b = rand(11, 99); }
     ans = a * b;
     text = `${a} × ${b}`;
-    return { text, ans, tip: mulTip(a, b, ans), isApprox: false };
+    return { text, ans, tip: mulTip(a, b, ans), isApprox: false, cat: "dd" };
   }
   if (realOp === "add" || realOp === "sub") {
     if (level === "easy")   { a = rand(10, 99); b = rand(2, 9); }
@@ -279,7 +286,7 @@ function genMental(op, level) {
     text = `${a} ÷ ${b}`;
     tip = divTip(a, b, q);
   }
-  return { text, ans, tip, isApprox: false };
+  return { text, ans, tip, isApprox: false, cat: realOp };
 }
 
 // ---------- approximation problems ----------
@@ -700,20 +707,23 @@ function startMental() {
 }
 
 function makeApproxQ(cat, used) {
+  let q;
   switch (cat) {
-    case "phys":  return genFromList(PHYS, used.phys);
-    case "chem":  return genFromList(CHEM, used.chem);
-    case "bio":   return genFromList(BIO, used.bio);
-    case "order": return Math.random() < 0.4 ? genNotation() : genOrder();
-    case "trig":  return genTrig();
-    case "explog": return genExpLog();
-    case "root":  return genRoot();
-    case "prob":  return genFromList(PROB, used.prob);
+    case "phys":  q = genFromList(PHYS, used.phys); break;
+    case "chem":  q = genFromList(CHEM, used.chem); break;
+    case "bio":   q = genFromList(BIO, used.bio); break;
+    case "order": q = Math.random() < 0.4 ? genNotation() : genOrder(); break;
+    case "trig":  q = genTrig(); break;
+    case "explog": q = genExpLog(); break;
+    case "root":  q = genRoot(); break;
+    case "prob":  q = genFromList(PROB, used.prob); break;
     default: { // mix — pick a random category each question
       const c = pick(["phys", "chem", "bio", "order", "trig", "explog", "root", "prob"]);
       return makeApproxQ(c, used);
     }
   }
+  q.cat = cat;
+  return q;
 }
 
 function startApprox() {
@@ -773,7 +783,7 @@ function submitAnswer() {
   } else {
     ok = val === q.ans;
   }
-  quiz.results.push({ q: q.text, ans: q.ans, given: raw, ok, ms, unit: q.unit || "" });
+  quiz.results.push({ q: q.text, ans: q.ans, given: raw, ok, ms, unit: q.unit || "", cat: q.cat });
   quiz.streak = ok ? quiz.streak + 1 : 0;
   const store = loadStore();
   if (quiz.streak > store.bestStreak) { store.bestStreak = quiz.streak; saveStore(store); }
@@ -839,7 +849,14 @@ function finishQuiz() {
   const correct = rs.filter(r => r.ok).length;
   const avgMs = rs.reduce((s, r) => s + r.ms, 0) / rs.length;
   const store = loadStore();
-  store.sessions.push({ d: todayStr(), mode: quiz.mode, correct, total: rs.length, avgMs: Math.round(avgMs) });
+  const cats = {};
+  for (const r of rs) {
+    if (!r.cat) continue;
+    if (!cats[r.cat]) cats[r.cat] = { c: 0, t: 0 };
+    cats[r.cat].t++;
+    if (r.ok) cats[r.cat].c++;
+  }
+  store.sessions.push({ d: todayStr(), mode: quiz.mode, correct, total: rs.length, avgMs: Math.round(avgMs), cats });
   saveStore(store);
 
   const modeLabel = quiz.mode === "mental" ? "暗算" : "近似計算";
@@ -922,6 +939,13 @@ function mergeBackup(text) {
       typeof s.correct === "number" && typeof s.total === "number" && typeof s.avgMs === "number";
     if (!valid) { skipped++; continue; }
     const rec = { d: s.d, mode: s.mode, correct: s.correct, total: s.total, avgMs: s.avgMs };
+    if (s.cats && typeof s.cats === "object") {
+      const cats = {};
+      for (const [k, v] of Object.entries(s.cats)) {
+        if (v && typeof v.c === "number" && typeof v.t === "number") cats[k] = { c: v.c, t: v.t };
+      }
+      if (Object.keys(cats).length) rec.cats = cats;
+    }
     const key = JSON.stringify(rec);
     if (seen.has(key)) { skipped++; continue; }
     cur.sessions.push(rec);
@@ -978,6 +1002,40 @@ function renderStats() {
       <text x="${x + (bw-12)/2}" y="${H - 6}" fill="#64748b" font-size="9" text-anchor="middle">${d.label}</text>`;
   }).join("");
 
+  // カテゴリ別集計（苦手順）
+  const CAT_LABELS = {
+    add: "たし算", sub: "ひき算", mul: "かけ算", div: "わり算", dd: "二桁の九九",
+    phys: "物理", chem: "化学", bio: "生物", order: "オーダー",
+    trig: "三角", explog: "指数対数", root: "根", prob: "確率統計",
+  };
+  const catAgg = { mental: {}, approx: {} };
+  for (const s of ss) {
+    if (!s.cats) continue;
+    const bucket = catAgg[s.mode];
+    if (!bucket) continue;
+    for (const [k, v] of Object.entries(s.cats)) {
+      if (!bucket[k]) bucket[k] = { c: 0, t: 0 };
+      bucket[k].c += v.c; bucket[k].t += v.t;
+    }
+  }
+  const catRows = mode => Object.entries(catAgg[mode])
+    .map(([k, v]) => ({ label: CAT_LABELS[k] || k, acc: v.t ? v.c / v.t : 0, c: v.c, t: v.t }))
+    .sort((a, b) => a.acc - b.acc)
+    .map(r => {
+      const pct = Math.round(r.acc * 100);
+      const cls = pct < 50 ? "low" : pct < 80 ? "mid" : "";
+      return `<div class="catrow"><span class="cl">${r.label}</span>
+        <span class="cb"><div class="${cls}" style="width:${pct}%"></div></span>
+        <span class="cv">${pct}%（${r.c}/${r.t}）</span></div>`;
+    }).join("");
+  const mentalRows = catRows("mental"), approxRows = catRows("approx");
+  const catCard = (mentalRows || approxRows) ? `
+    <div class="card">
+      <h2>カテゴリ別正答率 <span class="muted" style="font-weight:normal;font-size:12px">（苦手順）</span></h2>
+      ${mentalRows ? `<p class="muted" style="margin:8px 0 2px">暗算</p>${mentalRows}` : ""}
+      ${approxRows ? `<p class="muted" style="margin:14px 0 2px">近似計算</p>${approxRows}` : ""}
+    </div>` : "";
+
   const recent = ss.slice(-8).reverse();
   $("#main").innerHTML = `
     <div class="card">
@@ -995,6 +1053,7 @@ function renderStats() {
       <h2>直近14日の回答数 <span class="muted" style="font-weight:normal;font-size:12px">（水色=正解）</span></h2>
       <div class="chart-wrap"><svg viewBox="0 0 ${W} ${H}" width="100%">${bars}</svg></div>
     </div>
+    ${catCard}
     <div class="card">
       <h2>最近のセッション</h2>
       <table class="sess">
