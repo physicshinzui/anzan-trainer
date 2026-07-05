@@ -302,7 +302,7 @@ function genNotation() {
            note: `正確な値は <b>${fmt(ans)}</b>。仮数どうし・指数どうしを分けて計算するのがコツ。` };
 }
 
-const PHYSICS = [
+const PHYS = [
   { q: "光が太陽から地球まで届く時間は約何秒？（距離 1.5×10¹¹ m、光速 3×10⁸ m/s）",
     ans: 500, unit: "s", tol: 1.5,
     note: "1.5×10¹¹ ÷ 3×10⁸ = 0.5×10³ = <b>500 s</b>（約8分20秒）" },
@@ -392,6 +392,9 @@ const PHYSICS = [
     ans: 92, unit: "分", tol: 1.3,
     note: "周長2π×6.8×10⁶ ÷ 7700 ≈ 5500 s ≈ <b>92 分</b>" },
 
+];
+
+const CHEM_A = [
   // --- 原子・分子スケール ---
   { q: "水18 g（1 mol）に含まれる分子の数は約何個？（アボガドロ数）",
     ans: 6e23, unit: "個", tol: 1.3,
@@ -412,6 +415,9 @@ const PHYSICS = [
     ans: 22.4, unit: "L", tol: 1.3,
     note: "標準状態のモル体積 <b>≈ 22.4 L</b>" },
 
+];
+
+const BIO = [
   // --- 生物・生体分子 ---
   { q: "ヒトの体（約37兆個の細胞）の細胞数は約何個？",
     ans: 3.7e13, unit: "個", tol: 3,
@@ -435,6 +441,9 @@ const PHYSICS = [
     ans: 8.6e10, unit: "個", tol: 2,
     note: "大脳を含む脳全体で <b>≈ 8.6×10¹⁰ 個</b>（約860億）" },
 
+];
+
+const CHEM_B = [
   // --- 化学・溶液（mol濃度） ---
   { q: "純水のモル濃度は約何 mol/L？（水 1 L = 1000 g、18 g/mol）",
     ans: 55.5, unit: "M", tol: 1.3,
@@ -459,18 +468,172 @@ const PHYSICS = [
     note: "3×10⁻³ × 10⁻¹⁵ × 6×10²³ ≈ <b>1.8×10⁶ 個</b>（約200万分子）" },
 ];
 
-function genPhysics(used) {
-  let cand = PHYSICS.filter((_, i) => !used.has(i));
-  if (cand.length === 0) { used.clear(); cand = PHYSICS.slice(); }
+const CHEM = [...CHEM_A, ...CHEM_B];
+
+// pick a word-problem from a fixed list, avoiding repeats within a session
+function genFromList(list, used) {
+  let cand = list.filter(p => !used.has(p));
+  if (cand.length === 0) { used.clear(); cand = list.slice(); }
   const p = pick(cand);
-  used.add(PHYSICS.indexOf(p));
+  used.add(p);
   return { text: p.q, ans: p.ans, tol: p.tol, unit: p.unit, note: p.note, isApprox: true, isPhysics: true };
 }
+
+// ---------- オーダー評価 ----------
+function genOrder() {
+  const kind = pick(["pow2val", "pow2ord", "compord"]);
+  if (kind === "pow2val") {
+    const n = rand(10, 64);
+    const val = Math.pow(2, n);
+    const approxExp = n * Math.LN2 / Math.LN10;
+    return { text: `2${sup(n)} ≈ ?`, ans: val, tol: 1.6, unit: "", isApprox: true, isPhysics: true,
+      note: `2ⁿの桁数 ≈ n×0.30。${n}×0.30 = ${approxExp.toFixed(1)} → 約10${sup(Math.round(approxExp))}。正確には <b>${fmt(val)}</b>（2¹⁰≈10³ を使うと速い）` };
+  }
+  if (kind === "pow2ord") {
+    const n = rand(10, 64);
+    const exp = Math.floor(Math.log10(Math.pow(2, n)));
+    return { text: `2${sup(n)} は10の何乗くらい？（指数を整数で）`, ans: exp, tol: 0, unit: "乗", isApprox: true, intAns: true, isPhysics: true,
+      note: `n×log₁₀2 = ${n}×0.301 = ${(n * 0.301).toFixed(1)} → 指数 <b>${exp}</b>（2^${n} ≈ ${fmt(Math.pow(2, n))}）` };
+  }
+  // 合成式の指数（10の何乗）
+  const m1 = rand(11, 99) / 10, e1 = rand(-3, 9);
+  const m2 = rand(11, 99) / 10, e2 = rand(-3, 9);
+  const op = pick(["mul", "div", "cube"]);
+  let val, text;
+  if (op === "mul") { val = m1 * Math.pow(10, e1) * m2 * Math.pow(10, e2); text = `${sci(m1, e1)} × ${sci(m2, e2)}`; }
+  else if (op === "div") { val = m1 * Math.pow(10, e1) / (m2 * Math.pow(10, e2)); text = `${sci(m1, e1)} ÷ ${sci(m2, e2)}`; }
+  else { val = Math.pow(m1 * Math.pow(10, e1), 3); text = `(${sci(m1, e1)})${sup(3)}`; }
+  const exp = Math.floor(Math.log10(val));
+  return { text: `${text} は10の何乗くらい？（指数を整数で）`, ans: exp, tol: 0, unit: "乗", isApprox: true, intAns: true, isPhysics: true,
+    note: `仮数を1桁に丸め、指数どうしを足し引き。正確な値は ${fmt(val)} → 指数 <b>${exp}</b>` };
+}
+
+// ---------- 三角関数 ----------
+function genTrig() {
+  const kind = pick(["special", "smallRad", "smallDeg"]);
+  if (kind === "special") {
+    const t = pick([
+      ["sin30°", 0.5], ["sin45°", Math.SQRT1_2], ["sin60°", Math.sqrt(3) / 2], ["sin90°", 1],
+      ["cos30°", Math.sqrt(3) / 2], ["cos45°", Math.SQRT1_2], ["cos60°", 0.5],
+      ["tan30°", 1 / Math.sqrt(3)], ["tan45°", 1], ["tan60°", Math.sqrt(3)],
+    ]);
+    return { text: `${t[0]} ≈ ?`, ans: t[1], tol: 1.08, unit: "", isApprox: true, isPhysics: true,
+      note: `${t[0]} = <b>${fmt(t[1])}</b>。特殊角は暗記（√2≈1.41, √3≈1.73）。` };
+  }
+  if (kind === "smallRad") {
+    const th = rand(3, 20) / 100;
+    return { text: `sin(${th} rad) ≈ ?`, ans: Math.sin(th), tol: 1.1, unit: "", isApprox: true, isPhysics: true,
+      note: `小角近似 sinθ≈θ（ラジアン）→ 約 ${th}。正確には <b>${fmt(Math.sin(th))}</b>` };
+  }
+  const deg = pick([1, 2, 3, 5, 10]);
+  return { text: `sin${deg}° ≈ ?`, ans: Math.sin(deg * Math.PI / 180), tol: 1.15, unit: "", isApprox: true, isPhysics: true,
+    note: `${deg}° = ${deg}×π/180 ≈ ${(deg * Math.PI / 180).toFixed(3)} rad、sinθ≈θ で <b>${fmt(Math.sin(deg * Math.PI / 180))}</b>` };
+}
+
+// ---------- 指数・対数 ----------
+function genExpLog() {
+  const kind = pick(["exp", "ln", "log10", "solve2", "rule72"]);
+  if (kind === "exp") {
+    const n = pick([1, 2, 3, 0.5, 0.7, -1]);
+    return { text: `e^${n} ≈ ?`, ans: Math.exp(n), tol: 1.15, unit: "", isApprox: true, isPhysics: true,
+      note: `e≈2.72。e^${n} = <b>${fmt(Math.exp(n))}</b>（e^0.7≈2, e²≈7.4, e³≈20 が目安）` };
+  }
+  if (kind === "ln") {
+    const x = pick([2, 3, 5, 10, 20, 100, 1000]);
+    return { text: `ln ${x} ≈ ?`, ans: Math.log(x), tol: 1.15, unit: "", isApprox: true, isPhysics: true,
+      note: `ln2≈0.69, ln10≈2.30 を使う。ln ${x} = <b>${fmt(Math.log(x))}</b>` };
+  }
+  if (kind === "log10") {
+    const x = pick([2, 3, 5, 8, 20, 50, 200, 5000]);
+    return { text: `log₁₀ ${x} ≈ ?`, ans: Math.log10(x), tol: 1.12, unit: "", isApprox: true, isPhysics: true,
+      note: `log2≈0.30, log3≈0.48, log5≈0.70 の組合せ。log₁₀ ${x} = <b>${fmt(Math.log10(x))}</b>` };
+  }
+  if (kind === "solve2") {
+    const target = pick([100, 1000, 1e6, 1e9]);
+    return { text: `2^x = ${fmt(target)} のとき x ≈ ?`, ans: Math.log2(target), tol: 1.1, unit: "", isApprox: true, isPhysics: true,
+      note: `x = log₂(${fmt(target)}) = log₁₀ ÷ 0.30。2¹⁰≈10³ より <b>${fmt(Math.log2(target))}</b>` };
+  }
+  const rate = pick([2, 3, 4, 6, 8, 9, 12]);
+  return { text: `年利${rate}%で元本が2倍になるのは約何年？`, ans: 72 / rate, tol: 1.2, unit: "年", isApprox: true, isPhysics: true,
+    note: `72の法則: 72 ÷ ${rate} = <b>${fmt(72 / rate)} 年</b>（ln2≈0.69 の近似）` };
+}
+
+// ---------- 平方根・立方根 ----------
+function genRoot() {
+  const kind = pick(["sqrtSmall", "sqrtSci", "cbrtSmall", "cbrtSci", "concept"]);
+  if (kind === "sqrtSmall") {
+    const n = pick([2, 3, 5, 6, 7, 8, 10, 20, 50, 200]);
+    return { text: `√${n} ≈ ?`, ans: Math.sqrt(n), tol: 1.1, unit: "", isApprox: true, isPhysics: true,
+      note: `√2≈1.41, √3≈1.73, √10≈3.16 を軸に。√${n} = <b>${fmt(Math.sqrt(n))}</b>` };
+  }
+  if (kind === "sqrtSci") {
+    const m = rand(11, 99) / 10, e = rand(2, 12);
+    const val = m * Math.pow(10, e);
+    return { text: `√(${sci(m, e)}) ≈ ?`, ans: Math.sqrt(val), tol: 1.2, unit: "", isApprox: true, isPhysics: true,
+      note: `指数が奇数なら1つ借りて偶数に。例: √(a×10^odd)=√(10a)×10^((odd−1)/2)。正確には <b>${fmt(Math.sqrt(val))}</b>` };
+  }
+  if (kind === "cbrtSmall") {
+    const n = pick([2, 3, 5, 10, 20, 100]);
+    return { text: `∛${n} ≈ ?`, ans: Math.cbrt(n), tol: 1.12, unit: "", isApprox: true, isPhysics: true,
+      note: `∛2≈1.26, ∛10≈2.15。∛${n} = <b>${fmt(Math.cbrt(n))}</b>` };
+  }
+  if (kind === "cbrtSci") {
+    const e = pick([3, 6, 9, 7, 8]);
+    const m = pick([1, 2, 8, 27]);
+    const val = m * Math.pow(10, e);
+    return { text: `∛(${sci(m, e)}) ≈ ?`, ans: Math.cbrt(val), tol: 1.2, unit: "", isApprox: true, isPhysics: true,
+      note: `指数を3の倍数に寄せる。∛(10³)=10, ∛(10⁶)=10²。正確には <b>${fmt(Math.cbrt(val))}</b>` };
+  }
+  const c = pick([
+    ["半径が2倍になると球の体積は何倍？", 8, "倍", "体積は半径の3乗 → 2³ = 8倍"],
+    ["半径が3倍になると球の体積は何倍？", 27, "倍", "3³ = 27倍"],
+    ["面積が9倍になると1辺は何倍？", 3, "倍", "√9 = 3倍"],
+    ["体積が1000倍になると1辺は何倍？", 10, "倍", "∛1000 = 10倍"],
+    ["体積1 Lの立方体の1辺は約何cm？", 10, "cm", "∛1000 cm³ = 10 cm"],
+  ]);
+  return { text: c[0], ans: c[1], tol: 1.1, unit: c[2], isApprox: true, isPhysics: true, note: `<b>${c[3]}</b>` };
+}
+
+// ---------- 確率・統計 ----------
+const PROB = [
+  { q: "サイコロ2個の目の合計が7になる確率は約?", ans: 0.167, tol: 1.3, unit: "",
+    note: "6通り ÷ 36 = 1/6 ≈ <b>0.17</b>（7が最も出やすい）" },
+  { q: "サイコロ2個で両方6になる確率は約?", ans: 0.0278, tol: 1.4, unit: "",
+    note: "1/6 × 1/6 = 1/36 ≈ <b>0.028</b>" },
+  { q: "コインを10回投げて全部表になる確率は約?", ans: 9.8e-4, tol: 1.5, unit: "",
+    note: "(1/2)¹⁰ = 1/1024 ≈ <b>10⁻³</b>" },
+  { q: "コイン10回で表がちょうど5回出る確率は約?", ans: 0.246, tol: 1.3, unit: "",
+    note: "C(10,5)/1024 = 252/1024 ≈ <b>0.25</b>" },
+  { q: "23人いると誕生日が一致するペアがいる確率は約?", ans: 0.5, tol: 1.3, unit: "",
+    note: "誕生日のパラドックス。23人で <b>約0.5</b>、50人でほぼ確実。" },
+  { q: "正規分布で平均±1σの範囲に入る確率は約?", ans: 0.68, tol: 1.15, unit: "",
+    note: "68-95-99.7ルール → ±1σ で <b>0.68</b>" },
+  { q: "正規分布で平均±2σの範囲に入る確率は約?", ans: 0.95, tol: 1.1, unit: "",
+    note: "±2σ で <b>0.95</b>（外れるのは約5%）" },
+  { q: "正規分布で±3σを外れる確率は約?", ans: 0.003, tol: 2, unit: "",
+    note: "99.7%が±3σ内 → 外は <b>0.003</b>（0.3%）" },
+  { q: "サイコロを6回振って特定の目が一度も出ない確率は約?", ans: 0.335, tol: 1.3, unit: "",
+    note: "(5/6)⁶ ≈ <b>0.33</b>。「n回で1/n」の感覚は e⁻¹≈0.37 に近い。" },
+  { q: "10! はおよそいくつ？", ans: 3.6e6, tol: 1.5, unit: "",
+    note: "10! = 3,628,800 ≈ <b>3.6×10⁶</b>" },
+  { q: "1/100の当たりを100回引いて一度も当たらない確率は約?", ans: 0.366, tol: 1.3, unit: "",
+    note: "(1−1/100)¹⁰⁰ ≈ e⁻¹ ≈ <b>0.37</b>" },
+  { q: "52枚から2枚引いて両方エース（4枚）になる確率は約?", ans: 0.0045, tol: 1.5, unit: "",
+    note: "4/52 × 3/51 = 12/2652 ≈ <b>0.0045</b>（約1/221）" },
+];
+
+function genPhysics(used) { return genFromList(PHYS, used); }
 
 // ---------- app state ----------
 let tab = "mental";
 let mentalOp = "mix", mentalLevel = "normal";
+let approxCat = "mix";
 let quiz = null; // {mode, questions, idx, results:[], streak, qStart, timerId}
+
+const APPROX_CATS = [
+  ["phys", "物理"], ["chem", "化学"], ["bio", "生物"], ["order", "オーダー"],
+  ["trig", "三角"], ["explog", "指数対数"], ["root", "根"], ["prob", "確率統計"], ["mix", "ミックス"],
+];
 
 // ---------- views ----------
 function switchTab(t) {
@@ -516,12 +679,15 @@ function renderMentalSetup() {
 function renderApproxSetup() {
   $("#main").innerHTML = `
     <div class="card">
-      <h2>近似計算・物理概算（全8問）</h2>
-      <p class="muted">指数計算のドリルと、物理のフェルミ推定がミックスで出題されます。
-      答えが正解の <b>±30%〜数倍以内</b>（問題による）なら正解です。</p>
-      <p class="muted">入力例: <code>500</code> / <code>3.2e5</code> / <code>3.2×10^5</code> / <code>10^7</code></p>
+      <h2>近似計算（全8問）</h2>
+      <div class="row"><span class="label">カテゴリ</span>
+        ${APPROX_CATS.map(([v, l]) => `<button class="chip ${approxCat === v ? "sel" : ""}" data-cat="${v}">${l}</button>`).join("")}
+      </div>
+      <p class="muted">答えが正解の <b>±10%〜数倍以内</b>（問題による）なら正解。オーダー問題は指数を整数で答えます。</p>
+      <p class="muted">入力例: <code>500</code> / <code>3.2e5</code> / <code>3.2×10^5</code> / <code>0.5</code></p>
       <button class="start-btn" id="start">スタート</button>
     </div>`;
+  document.querySelectorAll("[data-cat]").forEach(b => b.onclick = () => { approxCat = b.dataset.cat; renderApproxSetup(); });
   $("#start").onclick = startApprox;
 }
 
@@ -533,16 +699,27 @@ function startMental() {
   showQuestion();
 }
 
+function makeApproxQ(cat, used) {
+  switch (cat) {
+    case "phys":  return genFromList(PHYS, used.phys);
+    case "chem":  return genFromList(CHEM, used.chem);
+    case "bio":   return genFromList(BIO, used.bio);
+    case "order": return Math.random() < 0.4 ? genNotation() : genOrder();
+    case "trig":  return genTrig();
+    case "explog": return genExpLog();
+    case "root":  return genRoot();
+    case "prob":  return genFromList(PROB, used.prob);
+    default: { // mix — pick a random category each question
+      const c = pick(["phys", "chem", "bio", "order", "trig", "explog", "root", "prob"]);
+      return makeApproxQ(c, used);
+    }
+  }
+}
+
 function startApprox() {
-  const used = new Set();
+  const used = { phys: new Set(), chem: new Set(), bio: new Set(), prob: new Set() };
   const qs = [];
-  for (let i = 0; i < 8; i++) {
-    qs.push(i % 2 === 0 ? genNotation() : genPhysics(used));
-  }
-  // shuffle
-  for (let i = qs.length - 1; i > 0; i--) {
-    const j = rand(0, i); [qs[i], qs[j]] = [qs[j], qs[i]];
-  }
+  for (let i = 0; i < 8; i++) qs.push(makeApproxQ(approxCat, used));
   quiz = { mode: "approx", questions: qs, idx: 0, results: [], streak: 0 };
   showQuestion();
 }
@@ -559,11 +736,12 @@ function showQuestion() {
       <div class="progressbar"><div style="width:${(quiz.idx / n) * 100}%"></div></div>
       <div class="qtext ${q.isPhysics ? "small" : ""}">${q.text}${q.isApprox && !q.isPhysics ? "" : ""}</div>
       <div class="answer-row">
-        <input id="ans" type="text" inputmode="${q.isApprox ? "text" : "numeric"}" enterkeyhint="done" autocomplete="off" placeholder="${q.isApprox ? "例: 3.2e5" : "答え"}">
+        <input id="ans" type="text" inputmode="${q.intAns ? "numeric" : (q.isApprox ? "text" : "numeric")}" enterkeyhint="done" autocomplete="off" placeholder="${q.intAns ? "例: 15" : (q.isApprox ? "例: 3.2e5" : "答え")}">
         ${q.unit ? `<span class="unit">${q.unit}</span>` : ""}
         <button id="submit">解答</button>
       </div>
-      ${q.isApprox ? `<p class="hint">近似でOK（正解の${q.tol <= 1.3 ? "±30%" : "数倍"}以内で正解）</p>` : ""}
+      ${q.intAns ? `<p class="hint">指数（10の何乗）を整数で。ぴったり正解のみ○</p>`
+        : q.isApprox ? `<p class="hint">近似でOK（正解の${q.tol <= 1.15 ? "±10%" : q.tol <= 1.3 ? "±30%" : "数倍"}以内で正解）</p>` : ""}
       <div id="fb"></div>
     </div>`;
   quiz.qStart = performance.now();
@@ -587,7 +765,9 @@ function submitAnswer() {
   const ms = performance.now() - quiz.qStart;
 
   let ok;
-  if (q.isApprox) {
+  if (q.intAns) {
+    ok = Math.round(val) === q.ans; // オーダー問題: 指数がぴったり
+  } else if (q.isApprox) {
     ok = val !== 0 && Math.sign(val) === Math.sign(q.ans) &&
          Math.max(Math.abs(val / q.ans), Math.abs(q.ans / val)) <= q.tol;
   } else {
